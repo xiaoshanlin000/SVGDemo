@@ -57,6 +57,22 @@ import UIKit
         guard let svgBucket = svgBucket else { return 0 }
         return svgBucket.fileCount
     }
+    
+    public func getAllImageNames()->Array<String>{
+        guard let svgBucket = svgBucket else { return [] }
+        return svgBucket.getAllImageNames()
+    }
+    
+    
+    public func getAllFileNames()->Array<String>{
+        guard let svgBucket = svgBucket else { return [] }
+        return svgBucket.getAllFileNames()
+    }
+    
+    public func hasImage(_ name:String)->Bool{
+        guard let svgBucket = svgBucket else { return false }
+        return svgBucket.hasImage(withName: name)
+    }
 }
 
 // UIImage扩展，提供便利方法

@@ -131,6 +131,11 @@
 			path = SVGBucket;
 			sourceTree = "<group>";
 		};
+		97E53D422F06A12500E16B4C /* Images */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Images;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -161,6 +166,7 @@
 		979043BB2F06478C00C3A5CF = {
 			isa = PBXGroup;
 			children = (
+				97E53D422F06A12500E16B4C /* Images */,
 				979043F92F0647C200C3A5CF /* xcframework */,
 				979043C62F06478C00C3A5CF /* SVGDemo */,
 				979044062F06483E00C3A5CF /* SVGBucket */,
@@ -218,6 +224,7 @@
 			fileSystemSynchronizedGroups = (
 				979043C62F06478C00C3A5CF /* SVGDemo */,
 				979043F92F0647C200C3A5CF /* xcframework */,
+				97E53D422F06A12500E16B4C /* Images */,
 			);
 			name = SVGDemo;
 			packageProductDependencies = (

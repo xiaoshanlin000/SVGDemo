@@ -5,58 +5,33 @@
 #include <filesystem>
 #include <sstream>
 
-// PNG 写入回调函数
-struct PNGWriteData {
-    std::shared_ptr<std::vector<uint8_t>> buffer; // 指向 vector 的指针
-    std::ofstream *file;
-};
-
-static void pngWriteCallback(void *closure, void *data, int size) {
-    auto *writeData = static_cast<PNGWriteData *>(closure);
-    if (writeData->buffer) {
-        uint8_t *bytes = static_cast<uint8_t *>(data);
-        writeData->buffer->insert(writeData->buffer->end(), bytes, bytes + size);
-    }
-    if (writeData->file && writeData->file->is_open()) {
-        writeData->file->write(static_cast<const char *>(data), size);
-    }
-}
-
 SVGBucket::SVGBucket(const std::string &filePath) :
-    m_filePath(filePath), m_fileStream(std::make_unique<std::ifstream>()) {}
+    m_filePath(filePath) {}
 
 SVGBucket::~SVGBucket() = default;
 
 SVGBucket::SVGBucket(SVGBucket &&other) noexcept :
-    m_filePath(std::move(other.m_filePath)), m_fileInfos(std::move(other.m_fileInfos)),
-    m_fileStream(std::move(other.m_fileStream)), m_indexTableSize(other.m_indexTableSize), m_ready(other.m_ready) {
+    m_filePath(std::move(other.m_filePath)),
+    m_fileInfos(std::move(other.m_fileInfos)),
+    m_dataBuffer(std::move(other.m_dataBuffer)),
+    m_dataSize(other.m_dataSize),
+    m_ready(other.m_ready) {
     other.m_ready = false;
-    other.m_indexTableSize = 0;
+    other.m_dataSize = 0;
 }
 
 SVGBucket &SVGBucket::operator=(SVGBucket &&other) noexcept {
     if (this != &other) {
         m_filePath = std::move(other.m_filePath);
         m_fileInfos = std::move(other.m_fileInfos);
-        m_fileStream = std::move(other.m_fileStream);
-        m_indexTableSize = other.m_indexTableSize;
+        m_dataBuffer = std::move(other.m_dataBuffer);
+        m_dataSize = other.m_dataSize;
         m_ready = other.m_ready;
 
         other.m_ready = false;
-        other.m_indexTableSize = 0;
+        other.m_dataSize = 0;
     }
     return *this;
-}
-
-bool SVGBucket::readBytes(std::vector<uint8_t> &buffer, size_t count) {
-    buffer.resize(count);
-    m_fileStream->read(reinterpret_cast<char *>(buffer.data()), count);
-    return m_fileStream->gcount() == static_cast<std::streamsize>(count);
-}
-
-bool SVGBucket::seekToOffset(uint32_t offset) {
-    m_fileStream->seekg(offset, std::ios::beg);
-    return m_fileStream->good();
 }
 
 bool SVGBucket::setup() {
@@ -64,79 +39,110 @@ bool SVGBucket::setup() {
         return true;
     }
 
-    m_fileStream->open(m_filePath, std::ios::binary);
-    if (!m_fileStream->is_open()) {
+    if (!loadAllDataToMemory()) {
+        return false;
+    }
+
+    m_ready = true;
+    return true;
+}
+
+bool SVGBucket::loadAllDataToMemory() {
+    std::ifstream fileStream(m_filePath, std::ios::binary | std::ios::ate);
+    if (!fileStream.is_open()) {
+        return false;
+    }
+
+    // 获取文件大小
+    std::streamsize fileSize = fileStream.tellg();
+    fileStream.seekg(0, std::ios::beg);
+
+    // 一次性读取整个文件到临时缓冲区
+    std::unique_ptr<uint8_t[]> entireFile(new uint8_t[fileSize]);
+    fileStream.read(reinterpret_cast<char*>(entireFile.get()), fileSize);
+    fileStream.close();
+
+    if (!fileStream) {
         return false;
     }
 
     // 验证魔数 "SVGB"
-    std::vector<uint8_t> magic(4);
-    if (!readBytes(magic, 4) || std::string(magic.begin(), magic.end()) != "SVGB") {
-        m_fileStream->close();
+    if (fileSize < 10 || std::string(entireFile.get(), entireFile.get() + 4) != "SVGB") {
         return false;
     }
 
-    // 跳过版本号 (2字节)
-    std::vector<uint8_t> version(2);
-    if (!readBytes(version, 2)) {
-        m_fileStream->close();
-        return false;
-    }
-
-    // 读取文件数量
-    std::vector<uint8_t> countData(4);
-    if (!readBytes(countData, 4)) {
-        m_fileStream->close();
-        return false;
-    }
-
+    // 解析文件数量 (跳过魔数4字节和版本2字节)
+    const uint8_t* dataPtr = entireFile.get() + 6;
     uint32_t fileCount = 0;
-    std::memcpy(&fileCount, countData.data(), 4);
+    std::memcpy(&fileCount, dataPtr, 4);
+    dataPtr += 4;
 
-    // 读取文件索引表
-    uint32_t currentIndexSize = 10; // 魔数4 + 版本2 + 文件数量4
+    // 解析文件索引表
+    std::vector<std::pair<std::string, FileInfo>> tempInfos;
+    tempInfos.reserve(fileCount);
 
+    const uint8_t* indexTableEnd = entireFile.get() + 10; // 初始偏移
     for (uint32_t i = 0; i < fileCount; ++i) {
         // 读取文件名长度
-        std::vector<uint8_t> nameLengthData(2);
-        if (!readBytes(nameLengthData, 2)) {
-            m_fileStream->close();
-            return false;
-        }
-        currentIndexSize += 2;
-
         uint16_t nameLength = 0;
-        std::memcpy(&nameLength, nameLengthData.data(), 2);
+        std::memcpy(&nameLength, dataPtr, 2);
+        dataPtr += 2;
+        indexTableEnd += 2;
 
         // 读取文件名
-        std::vector<uint8_t> nameData(nameLength);
-        if (!readBytes(nameData, nameLength)) {
-            m_fileStream->close();
-            return false;
-        }
-        currentIndexSize += nameLength;
-
-        std::string filename(nameData.begin(), nameData.end());
+        std::string filename(reinterpret_cast<const char*>(dataPtr), nameLength);
+        dataPtr += nameLength;
+        indexTableEnd += nameLength;
 
         // 读取文件偏移和大小
-        std::vector<uint8_t> offsetData(4);
-        std::vector<uint8_t> sizeData(4);
-        if (!readBytes(offsetData, 4) || !readBytes(sizeData, 4)) {
-            m_fileStream->close();
-            return false;
-        }
-        currentIndexSize += 8;
-
         uint32_t fileOffset = 0;
         uint32_t fileSize = 0;
-        std::memcpy(&fileOffset, offsetData.data(), 4);
-        std::memcpy(&fileSize, sizeData.data(), 4);
+        std::memcpy(&fileOffset, dataPtr, 4);
+        std::memcpy(&fileSize, dataPtr + 4, 4);
+        dataPtr += 8;
+        indexTableEnd += 8;
 
-        m_fileInfos[filename] = {fileOffset, fileSize};
+        tempInfos.emplace_back(filename, FileInfo{fileOffset, fileSize});
     }
 
-    m_indexTableSize = currentIndexSize;
-    m_ready = true;
+    // 计算索引表实际结束位置和总数据大小
+    uint32_t indexTableSize = static_cast<uint32_t>(indexTableEnd - entireFile.get());
+    uint32_t maxOffset = 0;
+    uint32_t maxSize = 0;
+    
+    for (const auto& info : tempInfos) {
+        uint32_t endPos = info.second.offset + info.second.size;
+        if (endPos > maxOffset) {
+            maxOffset = endPos;
+        }
+    }
+    
+    m_dataSize = maxOffset;
+    
+    // 分配连续内存块
+    m_dataBuffer.reset(new uint8_t[m_dataSize]);
+    
+    // 复制所有SVG数据到连续内存块
+    for (const auto& info : tempInfos) {
+        const uint8_t* srcData = entireFile.get() + indexTableSize + info.second.offset;
+        
+        // 确保数据在文件范围内
+        uint32_t actualSize = info.second.size;
+        if (indexTableSize + info.second.offset + actualSize > static_cast<uint32_t>(fileSize)) {
+            // 数据越界，调整大小
+            actualSize = static_cast<uint32_t>(fileSize) - (indexTableSize + info.second.offset);
+        }
+        
+        if (actualSize == 0 || info.second.offset + actualSize > m_dataSize) {
+            continue;
+        }
+        
+        std::memcpy(m_dataBuffer.get() + info.second.offset, srcData, actualSize);
+        
+        // 存储调整后的文件信息
+        m_fileInfos[info.first] = FileInfo{info.second.offset, actualSize};
+    }
+
     return true;
 }
 
@@ -148,9 +154,21 @@ std::string SVGBucket::normalizeImageName(const std::string &name) const {
     return normalized;
 }
 
-std::shared_ptr<std::vector<uint8_t>> SVGBucket::loadSVGData(const std::string &name) {
-    if (!m_ready || !m_fileStream) {
-        return nullptr;
+std::vector<uint8_t> SVGBucket::copyDataFromMemory(uint32_t offset, uint32_t size) const {
+    std::vector<uint8_t> data;
+    
+    if (!m_dataBuffer || offset >= m_dataSize || offset + size > m_dataSize) {
+        return data;
+    }
+    
+    data.resize(size);
+    std::memcpy(data.data(), m_dataBuffer.get() + offset, size);
+    return data;
+}
+
+std::vector<uint8_t> SVGBucket::getSVGData(const std::string &name) const {
+    if (!m_ready || !m_dataBuffer) {
+        return {};
     }
 
     std::string normalizedName = normalizeImageName(name);
@@ -168,35 +186,22 @@ std::shared_ptr<std::vector<uint8_t>> SVGBucket::loadSVGData(const std::string &
         }
 
         if (it == m_fileInfos.end()) {
-            return nullptr;
+            return {};
         }
     }
 
     const auto &info = it->second;
-    uint32_t actualOffset = m_indexTableSize + info.offset;
-
-    if (!seekToOffset(actualOffset)) {
-        return nullptr;
-    }
-
-    auto svgData = std::make_shared<std::vector<uint8_t>>(info.size);
-    m_fileStream->read(reinterpret_cast<char *>(svgData->data()), info.size);
-
-    if (m_fileStream->gcount() != static_cast<std::streamsize>(info.size)) {
-        return nullptr;
-    }
-
-    return svgData;
+    return copyDataFromMemory(info.offset, info.size);
 }
 
 SVGBucket::ImageInfoPtr SVGBucket::getImageInfo(const std::string &name, uint32_t width, uint32_t height,
                                                 uint32_t backgroundColor) {
-    auto svgData = loadSVGData(name);
-    if (!svgData || svgData->empty()) {
+    auto svgData = getSVGData(name);
+    if (svgData.empty()) {
         return nullptr;
     }
 
-    std::string svgString(svgData->begin(), svgData->end());
+    std::string svgString(svgData.begin(), svgData.end());
     auto document = lunasvg::Document::loadFromData(svgString);
     if (!document) {
         return nullptr;
@@ -247,5 +252,6 @@ std::vector<std::string> SVGBucket::getAllFileNames() const {
 bool SVGBucket::hasImage(const std::string &name) const {
     std::string normalizedName = normalizeImageName(name);
     return m_fileInfos.find(normalizedName) != m_fileInfos.end() ||
-           m_fileInfos.find(name + ".svg") != m_fileInfos.end() || m_fileInfos.find(name) != m_fileInfos.end();
+           m_fileInfos.find(name + ".svg") != m_fileInfos.end() ||
+           m_fileInfos.find(name) != m_fileInfos.end();
 }

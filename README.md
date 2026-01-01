@@ -37,8 +37,4 @@ Resource.initResource()
 
 ## 结果
 
-```
-2026-01-01 14:48:02.300 com.apple.main-thread  [init resource] use -> 11.1 ms
-2026-01-01 14:48:02.379 com.apple.main-thread  [load svg] use -> 388.5 μs
-2026-01-01 14:48:02.379 com.apple.main-thread  total file: 6260
-```
+![运行结果](Images/1.png)

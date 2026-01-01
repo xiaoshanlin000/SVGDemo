@@ -18,6 +18,7 @@
     // 非 Apple 平台
     #include <lunasvg/lunasvg.h>
 #endif
+
 class SVGBucket {
 public:
 
@@ -46,7 +47,7 @@ public:
     SVGBucket& operator=(SVGBucket&& other) noexcept;
 
     /**
-     * @brief 设置和初始化读取器
+     * @brief 设置和初始化读取器，一次性加载所有数据到连续内存
      * @return true 成功，false 失败
      */
     bool setup();
@@ -68,6 +69,13 @@ public:
                               uint32_t width = 0,
                               uint32_t height = 0,
                               uint32_t backgroundColor = 0x00000000);
+
+    /**
+     * @brief 获取 SVG 原始数据（实时复制）
+     * @param name 图片名称
+     * @return SVG 数据vector，失败返回空vector
+     */
+    std::vector<uint8_t> getSVGData(const std::string& name) const;
 
     /**
      * @brief 获取所有可用的图片名称（不带 .svg 后缀）
@@ -93,21 +101,33 @@ public:
      */
     size_t getFileCount() const { return m_fileInfos.size(); }
 
+    /**
+     * @brief 获取总内存大小
+     */
+    size_t getTotalMemorySize() const { return m_dataSize; }
+
 private:
     struct FileInfo {
-        uint32_t offset;
-        uint32_t size;
+        uint32_t offset;   // 在内存块中的偏移
+        uint32_t size;     // 数据大小
     };
 
     std::string m_filePath;
-    std::unordered_map<std::string, FileInfo> m_fileInfos;
-    std::unique_ptr<std::ifstream> m_fileStream;
-    uint32_t m_indexTableSize = 0;
+    std::unordered_map<std::string, FileInfo> m_fileInfos;  // 文件名到文件信息的映射
+    std::unique_ptr<uint8_t[]> m_dataBuffer;                // 连续内存块
+    size_t m_dataSize = 0;                                  // 内存块总大小
     bool m_ready = false;
 
     // 内部辅助方法
-    bool readBytes(std::vector<uint8_t>& buffer, size_t count);
-    bool seekToOffset(uint32_t offset);
-    std::shared_ptr<std::vector<uint8_t>> loadSVGData(const std::string& name);
     std::string normalizeImageName(const std::string& name) const;
+    
+    /**
+     * @brief 加载所有SVG数据到连续内存
+     */
+    bool loadAllDataToMemory();
+    
+    /**
+     * @brief 从内存块复制数据
+     */
+    std::vector<uint8_t> copyDataFromMemory(uint32_t offset, uint32_t size) const;
 };
