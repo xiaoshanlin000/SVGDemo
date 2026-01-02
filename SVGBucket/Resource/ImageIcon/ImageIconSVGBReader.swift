@@ -1,8 +1,8 @@
 // SVGB格式读取器 - 自动生成
 // 文件: ImageIcon.bundle/images.dat
-// 包含 6260 个SVG文件
-// 生成时间: 2025-12-31T21:01:35.474Z
-// 依赖: SVGBucket
+// 包含 12508 个SVG文件
+// 生成时间: 2026-01-02T13:41:03.474Z
+// 依赖: SVGBucketLoader
 // 最低支持: iOS 11.0
 
 import UIKit
@@ -18,7 +18,7 @@ import UIKit
 
     public func setup(bundle: Bundle = .main, filename: String = "images.dat") -> Bool {
         guard let _ = bundle.url(forResource: filename, withExtension: nil) else {
-            // print("❌ ImageiconSVGBReader: 找不到文件: \(filename)")
+            // print("❌ ImageiconSVGBReader: 找不到文件: (filename)")
             return false
         }
         guard let path = bundle.path(forResource: filename, ofType: nil) else { return false }
@@ -89,3 +89,4 @@ public extension UIImage {
         return ImageiconSVGBReader.shared.image(named: name)
     }
 }
+

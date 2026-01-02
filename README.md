@@ -1,14 +1,15 @@
 # SVGBucket
 
-iOS SVG图标资源库，兼容iOS 11+。集成6260个SVG图标，打包到ImageIcon.bundle中（4MB）。
+iOS SVG图标资源库，兼容iOS 11+。集成12508个SVG图标，打包到ImageIcon.bundle中（6MB）。
 
 ## 图标来源
 
 - https://github.com/dmhendricks/file-icon-vectors
 - https://icons.getbootstrap.com/
 - https://remixicon.com/
+- https://tabler.io/icons
 
-总共 6260 个图标。
+总共 12508 个图标。
 
 ## 依赖
 
@@ -25,9 +26,9 @@ Resource.initResource()
 特性
 支持iOS 11及以上版本
 
-集成6260个SVG图标
+集成12508个SVG图标
 
-图标资源打包为ImageIcon.bundle（4MB）
+图标资源打包为ImageIcon.bundle（6MB）
 
 基于LunaSVG的高性能渲染
 

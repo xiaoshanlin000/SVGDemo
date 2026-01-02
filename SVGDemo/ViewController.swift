@@ -167,8 +167,57 @@ class ViewController: UIViewController {
         }
     }
 }
+ 
 
-// MARK: - UICollectionViewDataSource
+extension ViewController{
+    
+      func showImageNameAlert(imageName: String) {
+        let alert = UIAlertController(title: "图片名称", message: imageName, preferredStyle: .alert)
+        
+        // 添加复制按钮
+        alert.addAction(UIAlertAction(title: "复制", style: .default, handler: { [weak self] _ in
+            UIPasteboard.general.string = imageName
+            self?.showToast(message: "已复制到剪贴板")
+        }))
+        
+        // 添加确定按钮
+        alert.addAction(UIAlertAction(title: "确定", style: .cancel, handler: nil))
+        
+        present(alert, animated: true, completion: nil)
+    }
+
+      func showToast(message: String, duration: TimeInterval = 1.5) {
+        let toastLabel = UILabel()
+        toastLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        toastLabel.textColor = UIColor.white
+        toastLabel.textAlignment = .center
+        toastLabel.font = UIFont.systemFont(ofSize: 14)
+        toastLabel.text = message
+        toastLabel.layer.cornerRadius = 10
+        toastLabel.clipsToBounds = true
+        toastLabel.alpha = 0
+        toastLabel.numberOfLines = 0
+        
+        let maxWidth = view.bounds.width - 80
+        let size = toastLabel.sizeThatFits(CGSize(width: maxWidth, height: CGFloat.greatestFiniteMagnitude))
+        toastLabel.frame = CGRect(x: 0, y: 0, width: min(size.width + 40, maxWidth), height: size.height + 20)
+        toastLabel.center = view.center
+        
+        view.addSubview(toastLabel)
+        
+        UIView.animate(withDuration: 0.3, animations: {
+            toastLabel.alpha = 1
+        }) { _ in
+            UIView.animate(withDuration: 0.3, delay: duration, options: [], animations: {
+                toastLabel.alpha = 0
+            }) { _ in
+                toastLabel.removeFromSuperview()
+            }
+        }
+    }
+}
+
+// MARK: - UICollectionViewDelegateFlowLayout
 extension ViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return imageNames.count
@@ -178,6 +227,7 @@ extension ViewController: UICollectionViewDataSource {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ImageCell", for: indexPath) as! ImageCollectionViewCell
         
         let name = imageNames[indexPath.item]
+        cell.imageName = name // 保存图片名称到cell
         
         // 首先检查缓存中是否有图片
         if let cachedImage = getCachedImage(for: name) {
@@ -193,7 +243,21 @@ extension ViewController: UICollectionViewDataSource {
             }
         }
         
+        // 为每个cell添加长按手势
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleCellLongPress(_:)))
+        longPressGesture.minimumPressDuration = 0.3
+        cell.addGestureRecognizer(longPressGesture)
+        
         return cell
+    }
+    
+    @objc private func handleCellLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        
+        guard let cell = gesture.view as? ImageCollectionViewCell,
+              let imageName = cell.imageName else { return }
+        
+        showImageNameAlert(imageName: imageName)
     }
 }
 
@@ -233,6 +297,9 @@ class ImageCollectionViewCell: UICollectionViewCell {
         return iv
     }()
     
+    // 添加一个属性来存储图片名称
+    var imageName: String?
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupUI()
@@ -245,6 +312,8 @@ class ImageCollectionViewCell: UICollectionViewCell {
     
     override func prepareForReuse() {
         super.prepareForReuse()
+        // 重置图片名称
+        imageName = nil
         // 这里可以不清空 image，因为在 cellForItemAt 中会重新设置
     }
     
