@@ -77,7 +77,7 @@ static void releaseDataCallback(void *info, const void *data, size_t size) {
     return _bucket ? _bucket->isReady() : NO;
 }
 
-+ (UIImage * _Nullable)imageFromBitmap:(SVGBucket::ImageInfoPtr)bitmap {
++ (UIImage * _Nullable)imageFromBitmap:(SVGBucket::ImageInfoPtr)bitmap scale:(CGFloat)scale {
     if (!bitmap) {
         //NSLog(@"[SVGLoader] Error: Invalid bitmap");
         return nil;
@@ -95,7 +95,7 @@ static void releaseDataCallback(void *info, const void *data, size_t size) {
     
     @try {
         uint8_t* srcData = bitmap->data();
-        int srcStride = bitmap->stride();
+//        int srcStride = bitmap->stride();
         
         if (!srcData) {
             //NSLog(@"[SVGLoader] Error: Bitmap data is null");
@@ -152,7 +152,7 @@ static void releaseDataCallback(void *info, const void *data, size_t size) {
         }
         
         UIImage *image = [UIImage imageWithCGImage:imageRef.get()
-                                             scale:1.0
+                                             scale:scale
                                        orientation:UIImageOrientationUp];
         
         return image;
@@ -173,7 +173,7 @@ static void releaseDataCallback(void *info, const void *data, size_t size) {
                        height:(uint32_t)height {
     auto scale = UIScreen.mainScreen.scale;
     auto info = _bucket->getImageInfo(name.UTF8String, width * scale, height * scale);
-    return [SVGBucketLoader imageFromBitmap:info];
+    return [SVGBucketLoader imageFromBitmap:info scale:scale];
 }
 
 

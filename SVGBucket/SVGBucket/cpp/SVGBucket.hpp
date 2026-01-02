@@ -62,13 +62,13 @@ public:
      * @param name 图片名称
      * @param width 目标宽度
      * @param height 目标高度
-     * @param backgroundColor 背景颜色
+     * @param rgba  true 转成rgba
      * @return 图片信息智能指针，失败返回空指针
      */
     ImageInfoPtr getImageInfo(const std::string& name,
                               uint32_t width = 0,
                               uint32_t height = 0,
-                              uint32_t backgroundColor = 0x00000000);
+                              bool rgba=true);
 
     /**
      * @brief 获取 SVG 原始数据（实时复制）
@@ -120,12 +120,12 @@ private:
 
     // 内部辅助方法
     std::string normalizeImageName(const std::string& name) const;
-    
+
     /**
      * @brief 加载所有SVG数据到连续内存
      */
     bool loadAllDataToMemory();
-    
+
     /**
      * @brief 从内存块复制数据
      */

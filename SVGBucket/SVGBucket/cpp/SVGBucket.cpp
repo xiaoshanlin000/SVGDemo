@@ -109,36 +109,36 @@ bool SVGBucket::loadAllDataToMemory() {
     uint32_t indexTableSize = static_cast<uint32_t>(indexTableEnd - entireFile.get());
     uint32_t maxOffset = 0;
     uint32_t maxSize = 0;
-    
+
     for (const auto& info : tempInfos) {
         uint32_t endPos = info.second.offset + info.second.size;
         if (endPos > maxOffset) {
             maxOffset = endPos;
         }
     }
-    
+
     m_dataSize = maxOffset;
-    
+
     // 分配连续内存块
     m_dataBuffer.reset(new uint8_t[m_dataSize]);
-    
+
     // 复制所有SVG数据到连续内存块
     for (const auto& info : tempInfos) {
         const uint8_t* srcData = entireFile.get() + indexTableSize + info.second.offset;
-        
+
         // 确保数据在文件范围内
         uint32_t actualSize = info.second.size;
         if (indexTableSize + info.second.offset + actualSize > static_cast<uint32_t>(fileSize)) {
             // 数据越界，调整大小
             actualSize = static_cast<uint32_t>(fileSize) - (indexTableSize + info.second.offset);
         }
-        
+
         if (actualSize == 0 || info.second.offset + actualSize > m_dataSize) {
             continue;
         }
-        
+
         std::memcpy(m_dataBuffer.get() + info.second.offset, srcData, actualSize);
-        
+
         // 存储调整后的文件信息
         m_fileInfos[info.first] = FileInfo{info.second.offset, actualSize};
     }
@@ -156,11 +156,11 @@ std::string SVGBucket::normalizeImageName(const std::string &name) const {
 
 std::vector<uint8_t> SVGBucket::copyDataFromMemory(uint32_t offset, uint32_t size) const {
     std::vector<uint8_t> data;
-    
+
     if (!m_dataBuffer || offset >= m_dataSize || offset + size > m_dataSize) {
         return data;
     }
-    
+
     data.resize(size);
     std::memcpy(data.data(), m_dataBuffer.get() + offset, size);
     return data;
@@ -195,7 +195,7 @@ std::vector<uint8_t> SVGBucket::getSVGData(const std::string &name) const {
 }
 
 SVGBucket::ImageInfoPtr SVGBucket::getImageInfo(const std::string &name, uint32_t width, uint32_t height,
-                                                uint32_t backgroundColor) {
+                                                bool rgba) {
     auto svgData = getSVGData(name);
     if (svgData.empty()) {
         return nullptr;
@@ -209,12 +209,14 @@ SVGBucket::ImageInfoPtr SVGBucket::getImageInfo(const std::string &name, uint32_
 
     // 渲染为位图
     auto bitmap = document->renderToBitmap(width > 0 ? static_cast<int>(width) : -1,
-                                           height > 0 ? static_cast<int>(height) : -1, backgroundColor);
+                                           height > 0 ? static_cast<int>(height) : -1, 0x00000000);
 
     if (bitmap.isNull()) {
         return nullptr;
     }
-    bitmap.convertToRGBA();
+    if (rgba) {
+        bitmap.convertToRGBA();
+    }
     return std::make_shared<lunasvg::Bitmap>(std::move(bitmap));
 }
 
