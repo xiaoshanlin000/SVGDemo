@@ -9,7 +9,7 @@ private func loadImage(_ name: String, targetSize:CGSize = CGSize(width: 24, hei
  * 自动生成的 UIImage 资源类
  *
  * 图标来源: https://tabler.io/icons
- * 生成时间: 2026-01-02
+ * 生成时间: 2026-01-03
  *
  */
 public class ImageTabler {

@@ -95,7 +95,7 @@ static void releaseDataCallback(void *info, const void *data, size_t size) {
     
     @try {
         uint8_t* srcData = bitmap->data();
-//        int srcStride = bitmap->stride();
+        //        int srcStride = bitmap->stride();
         
         if (!srcData) {
             //NSLog(@"[SVGLoader] Error: Bitmap data is null");
@@ -110,7 +110,7 @@ static void releaseDataCallback(void *info, const void *data, size_t size) {
         }
         
         std::memcpy(rgbaBuffer, srcData, bufferSize);
-    
+        
         CGDataProviderPtr provider(CGDataProviderCreateWithData(
                                                                 NULL,                    // info
                                                                 rgbaBuffer,              // data
@@ -172,7 +172,13 @@ static void releaseDataCallback(void *info, const void *data, size_t size) {
                         width:(uint32_t)width
                        height:(uint32_t)height {
     auto scale = UIScreen.mainScreen.scale;
-    auto info = _bucket->getImageInfo(name.UTF8String, width * scale, height * scale);
+    CGSize size;
+    if (width == 0 || height == 0) {
+        size = [self getImageSizeWithName:name];
+    }else{
+        size = CGSizeMake(width, height);
+    }
+    auto info = _bucket->getImageInfo(name.UTF8String, size.width * scale, size.height * scale);
     return [SVGBucketLoader imageFromBitmap:info scale:scale];
 }
 
@@ -183,7 +189,7 @@ static void releaseDataCallback(void *info, const void *data, size_t size) {
     }
     
     std::string nameStr = [name UTF8String];
-    auto size = _bucket->getImageInfo(nameStr);
+    auto size = _bucket->getImageInfo(nameStr, 0, 0, false);
     return CGSizeMake(size->width(), size->height());
 }
 
